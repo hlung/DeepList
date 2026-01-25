@@ -2,7 +2,7 @@ import SwiftUI
 
 @available(iOS 17.0, macOS 14.0, *)
 public struct DeepObservableRootView<DI: DeepItemProtocol & Observable, DD: DeepDraggable, Content: View, DragContent: View>: View {
-    
+
     @ObservedObject var deepList: DeepList
     let rootItem: DI
     let style: DeepStyle
@@ -11,12 +11,16 @@ public struct DeepObservableRootView<DI: DeepItemProtocol & Observable, DD: Deep
     let drop: ([DD], DeepPlace, CGPoint) -> Bool
     let content: (DI) -> Content
     let dragContent: (DI) -> DragContent
-    
+
+    /// When non-nil, the list will scroll to the view that has a matching `.id(...)`.
+    private var scrollTargetID: Binding<AnyHashable?>
+
     public init(
         deepList: DeepList,
         rootItem: DI,
         style: DeepStyle = .default,
         didTapBackground: @escaping () -> () = {},
+        scrollTargetID: Binding<AnyHashable?> = .constant(nil),
         drag: @escaping (DI) -> DD,
         drop: @escaping ([DD], DeepPlace, CGPoint) -> Bool,
         @ViewBuilder content: @escaping (DI) -> Content,
@@ -27,30 +31,31 @@ public struct DeepObservableRootView<DI: DeepItemProtocol & Observable, DD: Deep
         self.rootItem = rootItem
         self.style = style
         self.didTapBackground = didTapBackground
+        self.scrollTargetID = scrollTargetID
         self.drag = drag
         self.drop = drop
         self.content = content
         self.dragContent = dragContent
     }
-    
+
     @State private var isTargetTop: Bool = false
     @State private var isTargetBottom: Bool = false
     @State private var outerHeight: CGFloat = 0.0
     @State private var innerHeight: CGFloat = 0.0
-    
+
     private var remainingHeight: CGFloat {
         let totalHeight: CGFloat = style.scrollTopEdgeInset + innerHeight
         return max(style.scrollBottomEdgeInset, outerHeight - totalHeight)
     }
-    
+
     public var body: some View {
-        
+
         GeometryReader { geometry in
-            
+
             ScrollView {
-                
+
                 VStack(spacing: 0.0) {
-                    
+
                     Color.gray.opacity(0.001)
                         .frame(height: style.scrollTopEdgeInset)
                         .dropDestination(for: DD.self) { drops, location in
@@ -71,7 +76,7 @@ public struct DeepObservableRootView<DI: DeepItemProtocol & Observable, DD: Deep
                                 )
                             }
                         }
-                    
+
                     DeepObservableListView(
                         deepList: deepList,
                         rootItem: rootItem,
@@ -101,7 +106,7 @@ public struct DeepObservableRootView<DI: DeepItemProtocol & Observable, DD: Deep
                             innerHeight = 0.0
                         }
                     }
-                    
+
                     Color.gray.opacity(0.001)
                         .frame(height: remainingHeight)
                         .dropDestination(for: DD.self) { drops, location in
@@ -127,6 +132,7 @@ public struct DeepObservableRootView<DI: DeepItemProtocol & Observable, DD: Deep
                         }
                 }
             }
+            .scrollPosition(id: scrollTargetID)
             .onAppear {
                 outerHeight = geometry.size.height
             }
